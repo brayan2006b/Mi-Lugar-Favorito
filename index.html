@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Un regalo para ti</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Caveat:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#fdeef3;--mute:#c9b6d0;--rose:#f48fb1;--gold:#ffd77a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark}}
+:root[data-theme="dark"]{color-scheme:dark}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%}
+body{margin:0;background:linear-gradient(#070b1a,#16102e 55%,#2a1535);color:var(--ink);font-family:'Cormorant Garamond',Georgia,serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+#ui{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:calc(1.4rem + env(safe-area-inset-top,0px)) 1rem calc(1.2rem + env(safe-area-inset-bottom,0px));pointer-events:none;text-align:center;opacity:0;transition:opacity 2s}
+#ui.on{opacity:1}
+h1{margin:0;font:italic 500 clamp(2rem,8vw,3.8rem)/1.1 'Cormorant Garamond',serif;text-shadow:0 2px 14px rgba(7,11,26,.95),0 0 34px rgba(244,143,177,.7)}
+#cnt{margin:.5rem 0 0;color:var(--gold);font-size:clamp(1rem,3.6vw,1.4rem);font-variant-numeric:tabular-nums;text-shadow:0 2px 10px rgba(7,11,26,.95),0 0 18px rgba(255,215,122,.5)}
+#msg{width:min(92vw,520px);min-height:5.2rem;margin:0;padding:1rem 1.3rem;border-radius:20px;background:rgba(10,8,28,.5);border:1px solid rgba(244,143,177,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font:500 clamp(1.3rem,4.4vw,1.6rem)/1.35 Caveat,cursive;opacity:0;transition:opacity 1.5s;white-space:pre-wrap;position:relative}#msg .g{visibility:hidden}#msg .t{position:absolute;inset:1rem 1.3rem}
+#msg.on{opacity:1}
+#intro{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.4rem;padding:2rem;text-align:center;background:radial-gradient(circle at 50% 40%,rgba(42,21,53,.9),rgba(7,11,26,.97));transition:opacity 1.6s,visibility 1.6s}
+#intro.off{opacity:0;visibility:hidden}
+#intro p{margin:0;color:var(--mute);font-style:italic;font-size:clamp(1.15rem,4vw,1.5rem)}
+#intro h2{margin:0;font:italic 500 clamp(2.4rem,10vw,4.6rem)/1.05 'Cormorant Garamond',serif;text-shadow:0 0 40px rgba(244,143,177,.8)}
+.heart{font-size:2.4rem;color:#ff5c8a;text-shadow:0 0 24px #ff5c8a;animation:bt 1.6s infinite}
+@keyframes bt{0%,40%,100%{transform:scale(1)}12%{transform:scale(1.25)}24%{transform:scale(1.07)}}
+.btn{pointer-events:auto;font:600 1.25rem 'Cormorant Garamond',serif;color:var(--ink);background:rgba(244,143,177,.18);border:1px solid var(--rose);border-radius:999px;padding:.8rem 2rem;cursor:pointer;box-shadow:0 0 30px rgba(244,143,177,.3);transition:background .25s,transform .25s}
+.btn:hover{background:rgba(244,143,177,.4);transform:translateY(-2px)}
+#music{position:fixed;right:1rem;top:calc(1rem + env(safe-area-inset-top,0px));z-index:5;font-size:.95rem;padding:.45rem 1rem;opacity:0;transition:opacity 2s}
+#music.on{opacity:1}
+.btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01s!important}}
+</style>
+</head>
+<body>
+<canvas id="cv" aria-hidden="true"></canvas>
+<div id="ui"><div></div><p id="msg" role="status"><span id="mg" class="g"></span><span id="mx" class="t"></span></p></div>
+<button id="music" class="btn" type="button" aria-pressed="false">♪ Música</button>
+<div id="intro">
+  <div class="heart" aria-hidden="true">♥</div>
+  <h2 id="iname"></h2>
+  <p>Alguien muy especial plantó algo para ti.</p>
+  <button id="open" class="btn" type="button">Abrir mi regalo</button>
+</div>
+
+<script>
+/* =====================================================
+   PERSONALIZA AQUÍ (solo cambia estos textos)
+   ===================================================== */
+var CONFIG={
+  para:'Mi amor',   // nombre de quien recibe el regalo (sale en la bienvenida)
+  mensaje:'Desde que llegaste, todo florece.\nGracias por ser mi lugar favorito del mundo.\nTe amo, hoy y siempre.'
+};
+(function(){
+var $=function(i){return document.getElementById(i)};
+var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+$('iname').textContent='Para '+CONFIG.para;
+
+document.title='Un regalo para '+CONFIG.para;$('mg').textContent=CONFIG.mensaje;
+
+/* ---------- Lienzo ---------- */
+var cv=$('cv'),c=cv.getContext('2d'),W,H,DPR=Math.min(devicePixelRatio||1,2),time=0,wind=1,topY=0,rootY=0;
+function rs(){W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;c.setTransform(DPR,0,0,DPR,0,0);lay()}
+function lay(){var m=$('msg').getBoundingClientRect();topY=H*.07+24;rootY=Math.min(H*.86,Math.max(topY+140,m.top-22))}
+addEventListener('resize',rs);rs();
+function spr(sz,fn){var s=document.createElement('canvas');s.width=s.height=sz;fn(s.getContext('2d'),sz);return s}
+function glowSp(r,g,b){return spr(32,function(x){var q=x.createRadialGradient(16,16,0,16,16,16);q.addColorStop(0,'rgba(255,255,255,1)');q.addColorStop(.3,'rgba('+r+','+g+','+b+',.6)');q.addColorStop(1,'rgba('+r+','+g+','+b+',0)');x.fillStyle=q;x.fillRect(0,0,32,32)})}
+var glowS=glowSp(255,215,120),glowP=glowSp(255,120,170);
+var blos=[['#ffd0e0','#f48fb1'],['#ffe3ee','#f7a8c4'],['#ffc2d6','#ec7fa5']].map(function(cl){return spr(48,function(x,s){x.translate(s/2,s/2);x.rotate(Math.random()*6.28);for(var i=0;i<5;i++){x.rotate(6.2832/5);var g=x.createRadialGradient(0,-10,1,0,-10,12);g.addColorStop(0,cl[0]);g.addColorStop(1,cl[1]);x.fillStyle=g;x.beginPath();x.ellipse(0,-10,7,11,0,0,6.2832);x.fill()}x.fillStyle='#ffd77a';x.beginPath();x.arc(0,0,3,0,6.2832);x.fill()})});
+var petS=spr(24,function(x){var g=x.createLinearGradient(0,0,24,24);g.addColorStop(0,'#ffd0e0');g.addColorStop(1,'#ef7fa6');x.fillStyle=g;x.beginPath();x.ellipse(12,12,5,10,.6,0,6.2832);x.fill()});
+var stars=[],fl=[],shoot=[],spk=[],pet=[],hts=[],i;
+for(i=0;i<150;i++)stars.push({x:Math.random(),y:Math.random()*.7,r:Math.random()*1.3+.3,p:Math.random()*6.28});
+for(i=0;i<42;i++)fl.push({x:Math.random(),y:.45+Math.random()*.5,p:Math.random()*6.28,s:Math.random()*.5+.3});
+
+function sky(){
+  c.fillStyle='#fff';
+  for(var i=0;i<stars.length;i++){var s=stars[i];c.globalAlpha=.35+.65*Math.abs(Math.sin(time*.8+s.p));c.fillRect(s.x*W,s.y*H,s.r,s.r)}
+  c.globalAlpha=1;
+  if(!reduce&&Math.random()<.004)shoot.push({x:Math.random()*W*.8,y:Math.random()*H*.3,l:1});
+  for(i=shoot.length-1;i>=0;i--){var q=shoot[i];q.x+=10;q.y+=4;q.l-=.02;if(q.l<=0){shoot.splice(i,1);continue}
+    var gr=c.createLinearGradient(q.x,q.y,q.x-120,q.y-48);gr.addColorStop(0,'rgba(255,255,255,'+q.l+')');gr.addColorStop(1,'rgba(255,255,255,0)');
+    c.strokeStyle=gr;c.lineWidth=1.6;c.beginPath();c.moveTo(q.x,q.y);c.lineTo(q.x-120,q.y-48);c.stroke()}
+  var mx=W*.82,my=H*.2,mr=Math.min(W,H)*.07,g=c.createRadialGradient(mx,my,mr*.8,mx,my,mr*4.5);
+  g.addColorStop(0,'rgba(255,240,210,.38)');g.addColorStop(1,'rgba(255,240,210,0)');c.fillStyle=g;c.fillRect(mx-mr*5,my-mr*5,mr*10,mr*10);
+  c.fillStyle='#fff3da';c.beginPath();c.arc(mx,my,mr,0,6.2832);c.fill();
+  c.fillStyle='#0d1530';c.beginPath();c.moveTo(0,rootY+H*.03);c.quadraticCurveTo(W*.5,rootY-H*.03,W,rootY+H*.03);c.lineTo(W,H);c.lineTo(0,H);c.fill()}
+function front(){c.fillStyle='#070a18';c.beginPath();c.moveTo(0,H*.92);c.quadraticCurveTo(W*.25,H*.87,W*.5,H*.94);c.quadraticCurveTo(W*.8,H*.87,W,H*.92);c.lineTo(W,H);c.lineTo(0,H);c.fill()}
+function spark(x,y,n){for(var i=0;i<n;i++){var a=Math.random()*6.28,v=Math.random()*3+.6;spk.push({x:x,y:y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-1,l:1})}}
+function lights(){
+  c.globalCompositeOperation='lighter';
+  var i;
+  for(i=0;i<fl.length;i++){var f=fl[i],x=f.x*W+Math.sin(time*f.s+f.p)*40,y=f.y*H+Math.cos(time*f.s*1.3+f.p)*26;c.globalAlpha=.25+.75*Math.abs(Math.sin(time*1.4+f.p*3));c.drawImage(glowS,x-9,y-9,18,18)}
+  for(i=spk.length-1;i>=0;i--){var p=spk[i];p.vy+=.05;p.x+=p.vx;p.y+=p.vy;p.vx*=.985;p.l-=.014;if(p.l<=0){spk.splice(i,1);continue}c.globalAlpha=p.l;c.drawImage(glowS,p.x-6,p.y-6,12,12)}
+  c.globalAlpha=1;c.globalCompositeOperation='source-over'}
+
+/* ---------- Árbol ---------- */
+var T=null,tStart=0,pts=[],L,Wd,Bz,rootY,landed=false,bloomed=false;
+function mk(a,l,w,d){
+  var n={a:a,l:l,w:w,d:d,k:[],b:false,ph:Math.random()*6.28,t0:0,dur:0,bs:.8+Math.random()*.6,v:Math.random()*3|0};
+  if(d<8){var cnt=d===0?1:(d<3?2:(Math.random()<.22?3:2));
+    for(var i=0;i<cnt;i++){var sp=cnt===1?(Math.random()-.5)*.1:(i-(cnt-1)/2)*(.5+Math.random()*.3)+(Math.random()-.5)*.3;n.k.push(mk(sp,l*(.76+Math.random()*.08),w*.7,d+1))}}
+  n.b=d>=7||(d>=5&&Math.random()<.45);return n}
+function tm(n,t){n.t0=t;n.dur=n.d===0?1.4:.42;for(var i=0;i<n.k.length;i++)tm(n.k[i],t+n.dur*.85)}
+function dr(n,x,y,ang,t){
+  var f=(t-n.t0)/n.dur;if(f<=0)return;if(f>1)f=1;f=1-(1-f)*(1-f);
+  var a=ang+n.a+Math.sin(time*.8+n.d*.6+n.ph)*.009*n.d*wind,len=n.l*L*f,x2=x+Math.sin(a)*len,y2=y-Math.cos(a)*len;
+  c.lineWidth=Math.max(.8,n.w*Wd);c.beginPath();c.moveTo(x,y);c.lineTo(x2,y2);c.stroke();
+  if(f<1)return;
+  if(n.b){var s=(t-n.t0-n.dur)/1.8;if(s>0){s=s>1?1:s;s=1-Math.pow(1-s,3);var z=Bz*n.bs*s;c.drawImage(blos[n.v],x2-z/2,y2-z/2,z,z);if(s>=1)pts.push(x2,y2)}}
+  for(var i=0;i<n.k.length;i++)dr(n.k[i],x2,y2,a,t)}
+function petals(go){
+  if(go&&pts.length&&Math.random()<.16&&pet.length<110){var j=(Math.random()*pts.length/2|0)*2;pet.push({x:pts[j],y:pts[j+1],v:.5+Math.random()*.7,w:Math.random()*6.28,a:Math.random()*6.28,z:.7+Math.random()*.7})}
+  for(var i=pet.length-1;i>=0;i--){var p=pet[i];p.y+=p.v;p.w+=.02;p.a+=.03;p.x+=Math.sin(p.w)*.8+.25*wind;
+    if(p.y>H*.9){pet.splice(i,1);continue}
+    c.save();c.translate(p.x,p.y);c.rotate(p.a);c.scale(Math.abs(Math.cos(p.w))*.7+.3,1);c.drawImage(petS,-6*p.z,-6*p.z,12*p.z,12*p.z);c.restore()}}
+function crownGlow(){
+  c.globalCompositeOperation='lighter';c.globalAlpha=.16;
+  for(var i=0;i<pts.length;i+=2){c.drawImage(glowP,pts[i]-Bz,pts[i+1]-Bz,Bz*2,Bz*2)}
+  c.globalAlpha=1;c.globalCompositeOperation='source-over'}
+function hearts(){
+  c.textAlign='center';
+  for(var i=hts.length-1;i>=0;i--){var h=hts[i];h.y-=h.v;h.x+=Math.sin(h.y*.03+h.p)*.6;h.l-=.008;if(h.l<=0){hts.splice(i,1);continue}
+    c.globalAlpha=h.l;c.fillStyle=h.c;c.font=h.s+'px serif';c.fillText('♥',h.x,h.y)}
+  c.globalAlpha=1}
+cv.addEventListener('pointerdown',function(e){if(!T)return;var C=['#ff7aa8','#ffb3cc','#ffd9a0','#ff4d88'];for(var i=0;i<9;i++)hts.push({x:e.clientX+Math.random()*30-15,y:e.clientY,v:1+Math.random()*1.6,l:1,s:16+Math.random()*22,p:Math.random()*6,c:C[Math.random()*4|0]});spark(e.clientX,e.clientY,10)});
+
+function gY(x){var t=x/W,a=rootY+H*.03,b=rootY-H*.03;return a*((1-t)*(1-t)+t*t)+2*(1-t)*t*b}
+function ss(x){x=x<0?0:x>1?1:x;return x*x*(3-2*x)}
+function person(x,y,h,dir,wm,lean,k,w,ph){
+  c.save();c.translate(x,y);c.scale(dir,1);c.fillStyle=c.strokeStyle='#02030a';c.lineCap='round';c.lineJoin='round';
+  var sw=Math.sin(ph)*.09*h*w,tl=.36*h;
+  c.lineWidth=h*(wm?.045:.065);c.beginPath();c.moveTo(-.02*h,-.45*h);c.lineTo(-.03*h+sw,0);c.moveTo(.02*h,-.45*h);c.lineTo(.03*h-sw,0);c.stroke();
+  c.translate(0,-.45*h);
+  if(wm){c.beginPath();c.moveTo(-.05*h,-.12*h);c.lineTo(.05*h,-.12*h);c.lineTo(.17*h,.26*h);c.lineTo(-.17*h,.26*h);c.closePath();c.fill()}
+  c.rotate(lean);
+  c.beginPath();
+  if(wm){c.moveTo(-.05*h,0);c.lineTo(.05*h,0);c.lineTo(.055*h,-tl);c.lineTo(-.055*h,-tl)}else{c.moveTo(-.07*h,0);c.lineTo(.07*h,0);c.lineTo(.095*h,-tl);c.lineTo(-.095*h,-tl)}
+  c.closePath();c.fill();c.fillRect(-.02*h,-tl-.04*h,.04*h,.06*h);
+  var hx=(.01+((wm?.17:.2)-.01)*k)*h,hy=(-tl+.29*h)+((wm?-tl-.0*h:-.2*h)-(-tl+.29*h))*k;
+  c.lineWidth=h*.05;c.beginPath();c.moveTo(0,-tl+.03*h);c.lineTo(hx,hy);c.stroke();
+  c.translate(.01*h,-tl-.05*h);c.rotate(k*.25);
+  c.beginPath();c.arc(.012*h,-.045*h,.075*h,0,6.2832);c.fill();
+  if(wm){c.beginPath();c.ellipse(-.06*h,-.01*h,.05*h,.08*h,.3,0,6.2832);c.fill()}
+  c.restore()}
+function couple(tt){
+  var h=Math.min(H*.12,L*.9),cx=Math.min(W/2+L*1.35,W-h*1.1),u=reduce?9:(tt-4)%15,al=reduce?1:Math.min(1,(tt-4)/2);
+  var g0=h*1.15,g1=h*.34,gap=g0,k=0,w=0,p;
+  if(u<2.5){gap=g0}
+  else if(u<5.5){p=(u-2.5)/3;gap=g0+(g1-g0)*ss(p);w=Math.min(1,p*6,(1-p)*6)}
+  else if(u<7.5){gap=g1;k=ss((u-5.5)/2)}
+  else if(u<11){gap=g1;k=1}
+  else if(u<12.5){gap=g1;k=1-ss((u-11)/1.5)}
+  else{p=(u-12.5)/2.5;gap=g1+(g0-g1)*ss(p);w=Math.min(1,p*6,(1-p)*6)}
+  var mx=cx-gap/2,wx=cx+gap/2,ln=k*.2;
+  if(k>0){c.globalCompositeOperation='lighter';c.globalAlpha=.55*k*al;c.drawImage(glowP,cx-h*.8,gY(cx)-h*1.5,h*1.6,h*1.2);c.globalCompositeOperation='source-over'}
+  c.globalAlpha=al;
+  person(mx,gY(mx)+2,h,1,false,ln+Math.sin(time*1.3)*.012,k,w,time*8);
+  person(wx,gY(wx)+2,h*.93,-1,true,ln+Math.sin(time*1.1+1)*.012,k,w,time*8+1);
+  c.globalAlpha=1;
+  var ci=Math.floor((tt-4)/15);
+  if(!reduce&&u>7.5&&u<8.4&&ci!==cyc){cyc=ci;var C=['#ff7aa8','#ffb3cc','#ff4d88'];for(var i=0;i<6;i++)hts.push({x:cx+Math.random()*30-15,y:gY(cx)-h*1.05,v:.8+Math.random(),l:1,s:14+Math.random()*16,p:Math.random()*6,c:C[i%3]});spark(cx,gY(cx)-h*.95,18)}}
+var msgT=CONFIG.mensaje,shown=-1,cyc=-1;
+function loop(now){
+  time=now/1000;wind=1+Math.pow(Math.max(0,Math.sin(time*.35)),3)*3;
+  c.clearRect(0,0,W,H);sky();
+  if(T){
+    pts.length=0;L=Math.max(28,Math.min((rootY-topY)/4.9,W*.25));Wd=Math.max(7,Math.min(W,H)*.022);Bz=Math.max(13,Math.min(W,H)*.03);
+    var tt=time-tStart;
+    if(tt<1.2){var p=Math.min(1,tt/1.2);c.globalCompositeOperation='lighter';c.drawImage(glowS,W/2-16,topY+(rootY-topY)*p*p-16,32,32);c.globalCompositeOperation='source-over'}
+    else if(!landed){landed=true;spark(W/2,rootY,40)}
+    c.strokeStyle='#7a4a5c';c.lineCap='round';dr(T,W/2,rootY,0,tt-1.2);
+    crownGlow();petals(tt>6.5);if(tt>4)couple(tt);
+    if(tt>8&&!bloomed){bloomed=true;$('msg').classList.add('on');spark(W/2,(topY+rootY)/2,60)}
+    if(bloomed){var k=reduce?msgT.length:Math.min(msgT.length,Math.floor((tt-8)*26));if(k!==shown){shown=k;$('mx').textContent=msgT.slice(0,k)}}
+  }
+  front();lights();hearts();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+function grow(){T=mk(0,1.2,1,0);tm(T,0);tStart=reduce?-100:performance.now()/1000;pet.length=0;landed=false;bloomed=false;shown=-1;cyc=-1}
+
+setInterval(lay,1000);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(lay);
+
+/* ---------- Música generativa ---------- */
+var ac,mt,on=false,step=0,master;
+var CH=[[220,261.6,329.6],[174.6,220,261.6],[261.6,329.6,392],[196,246.9,293.7]];
+function note(f,t0,d,vol,type){var o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+.05);g.gain.exponentialRampToValueAtTime(.0001,t0+d);o.connect(g);g.connect(master);o.start(t0);o.stop(t0+d+.1)}
+function play(){var t0=ac.currentTime+.05,ch=CH[(step/8|0)%4],j=step%8;if(j===0)ch.forEach(function(f){note(f/2,t0,4.2,.05,'sine')});note(ch[j%3]*2,t0,1.6,.06,'triangle');step++}
+function music(){
+  try{if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();master=ac.createGain();var lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1800;var dl=ac.createDelay();dl.delayTime.value=.42;var fb=ac.createGain();fb.gain.value=.45;master.connect(lp);lp.connect(ac.destination);lp.connect(dl);dl.connect(fb);fb.connect(dl);dl.connect(ac.destination)}
+    on=!on;$('music').setAttribute('aria-pressed',on);$('music').textContent=on?'♪ Pausar':'♪ Música';
+    if(on){ac.resume();play();mt=setInterval(play,600)}else{clearInterval(mt);ac.suspend()}}catch(e){}}
+$('music').addEventListener('click',music);
+
+/* ---------- Inicio ---------- */
+$('open').addEventListener('click',function(){
+  $('intro').classList.add('off');$('ui').classList.add('on');$('music').classList.add('on');
+  if(!on)music();grow()});
+})();
+</script>
+</body>
+</html>
